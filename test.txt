@@ -1,7 +1,4 @@
 my first github test.
 welcome to tutorial.
-<<<<<<< HEAD
 hi hello 123
-=======
-hi hello abc
->>>>>>> developer-1
+
