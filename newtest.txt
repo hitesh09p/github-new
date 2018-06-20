@@ -1,4 +1,9 @@
 hi welcome to the github tutorial
 hi
+<<<<<<< .mine
 welcome 123
 
+=======
+welcome 1234
+
+>>>>>>> .theirs
