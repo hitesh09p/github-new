@@ -1,4 +1,9 @@
 my first github test.
 welcome to tutorial.
+<<<<<<< .mine
 hi hello!!!
 
+=======
+hi hello!
+
+>>>>>>> .theirs
