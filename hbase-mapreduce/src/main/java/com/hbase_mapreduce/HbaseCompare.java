@@ -1,5 +1,9 @@
 package com.hbase_mapreduce;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -8,6 +12,8 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.mapreduce.TableSplit;
+import org.apache.hadoop.hbase.util.Bytes;
 //import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
@@ -29,25 +35,28 @@ public class HbaseCompare {
       //  conf.set("hbase.zookeeper.property.clientPort", "2181");
 		Job job = new Job(config,"HbaseCompare");
 		job.setJarByClass(com.hbase_mapreduce.HbaseCompare.class);     // class that contains mapper and reducer
+		List<Scan> scans = new ArrayList<Scan>();
 
-		Scan scan = new Scan();
-		scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
-		scan.setCacheBlocks(false);
-		//scan.setAttribute("scan.attributes.table.name", Bytes.toBytes("inception_tbl"));
-		// don't set to true for MR jobs
-		// set other scan attrs
+		Scan scan1 = new Scan();
+		scan1.setAttribute("scan.attributes.table.name", Bytes.toBytes("inception_tbl1"));
+		System.out.println(scan1.getAttribute("scan.attributes.table.name"));
+		scans.add(scan1);
 
-		TableMapReduceUtil.initTableMapperJob(
-			"inception_tbl1",        // input table
-			scan,               // Scan instance to control CF and attribute selection
+		Scan scan2 = new Scan();
+		scan2.setAttribute("scan.attributes.table.name", Bytes.toBytes("fin_str1"));
+		System.out.println(scan2.getAttribute("scan.attributes.table.name"));
+		scans.add(scan2);
+
+		TableMapReduceUtil.initTableMapperJob(       
+			scans,               // Scan instance to control CF and attribute selection
 			MyMapper.class,     // mapper class
 			Text.class,         // mapper output key
-			IntWritable.class,  // mapper output value
+			Text.class,  // mapper output value
 			job);
-		job.setReducerClass(MyReducer.class);    // reducer class
-		job.setNumReduceTasks(1);    // at least one, adjust as required
+		//job.setReducerClass(MyReducer.class);    // reducer class
+	//	job.setNumReduceTasks(1);    // at least one, adjust as required
 		
-		FileOutputFormat.setOutputPath(job, new Path("/mr/mySummaryFile")); // adjust directories as required
+		FileOutputFormat.setOutputPath(job, new Path("/newmroutput")); // adjust directories as required
         
 		try {
 			System.exit(job.waitForCompletion(true) ? 0 : 1);
@@ -59,21 +68,49 @@ public class HbaseCompare {
 			e.printStackTrace();
 		}
 	}
-	public static class MyMapper extends TableMapper<Text, IntWritable>  {
-		  public static final byte[] CF = "cf".getBytes();
-		  public static final byte[] ATTR1 = "attr1".getBytes();
+	public static class MyMapper extends TableMapper<Text, Text>  {
+		private static byte[] inception_tbl1 = Bytes.toBytes("inception_tbl1");
+		private static byte[] fin_str1 = Bytes.toBytes("fin_str1");
+		
+		byte[] acc_key;
+		String Acc_key;
+		// private Text col_name = new Text("acc-key");
+		 Text mapperKey;
+		 Text mapperValue;
+		 
 
-		  private final IntWritable ONE = new IntWritable(1);
-		  private Text text = new Text();
-
-		  public void map(ImmutableBytesWritable row, Result value, Context context) throws IOException, InterruptedException {
-		    String val = new String(value.getValue(CF, ATTR1));
-		    text.set(val);     // we can only emit Writables...
-		    context.write(text, ONE);
+		  public void map(ImmutableBytesWritable row, Result columns, Context context) throws IOException, InterruptedException {
+			  
+			  TableSplit currentSplit = (TableSplit)context.getInputSplit();
+				byte[] tableName = currentSplit.getTableName();
+			  
+				try {
+					if (Arrays.equals(tableName, inception_tbl1)) {
+						acc_key = columns.getValue(Bytes.toBytes("acc"), Bytes.toBytes("acc_key"));
+						Acc_key = new String(acc_key);
+						
+						mapperKey = new Text("acc_key_tbl1");
+						mapperValue = new Text(Acc_key);
+						context.write(mapperKey, mapperValue);
+					} else if (Arrays.equals(tableName, fin_str1)) {
+						acc_key = columns.getValue(Bytes.toBytes("acc"), Bytes.toBytes("acc_key"));
+						Acc_key = new String(acc_key);
+						
+						mapperKey = new Text("acc_key_tbl2");
+						mapperValue = new Text(Acc_key);
+						context.write(mapperKey, mapperValue);
+					}
+				} catch (Exception e) {
+					// TODO : exception handling logic
+					e.printStackTrace();
+				}
+			  
+			  
+		
 		  }
 		}
 	
-	public static class MyReducer extends Reducer<Text, IntWritable, Text, IntWritable>  {
+	/*public static class MyReducer extends Reducer<Text, IntWritable, Text, IntWritable>  {
 
 		  public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
 		    int i = 0;
@@ -82,7 +119,7 @@ public class HbaseCompare {
 		    }
 		    context.write(key, new IntWritable(i));
 		  }
-		}
+		}*/
 		
 
 	
